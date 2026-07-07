@@ -997,7 +997,8 @@ function renderFundRows(funds, totalAmt) {
   funds.sort((a, b) => (a.pnl || 0) - (b.pnl || 0));
 
   listEl.innerHTML = funds.map((f, i) => {
-    const chg = parseFloat(f.change || 0);
+    const chg = f.change !== undefined ? parseFloat(f.change) : null;
+    const hasNav = f.nav !== undefined && f.nav !== null && !isNaN(f.nav);
     const pnl = f.pnl || 0;
     const pnlRate = f.pnlRate !== undefined ? f.pnlRate : (f.amount ? (pnl / f.amount * 100) : 0);
     const weight = totalAmt ? ((f.amount || 0) / totalAmt * 100) : 0;
@@ -1012,8 +1013,8 @@ function renderFundRows(funds, totalAmt) {
         (f.sector ? '<span class="sector-t">' + f.sector + '</span>' : '') +
       '</div>' +
       '<div class="amt">' + formatMoney(f.amount || 0) + '</div>' +
-      '<div class="nav">' + (f.nav ? f.nav.toFixed(4) : (f.navPrev || '--')) + '</div>' +
-      '<div class="chg ' + (chg >= 0 ? 'up' : 'down') + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%</div>' +
+      '<div class="nav">' + (hasNav ? f.nav.toFixed(4) : '--') + '</div>' +
+      '<div class="chg ' + (chg !== null ? (chg >= 0 ? 'up' : 'down') : 'neutral') + '">' + (chg !== null ? (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%' : '--') + '</div>' +
       '<div class="pct hide-mobile ' + (pnlRate >= 0 ? 'up' : 'down') + '">' + (pnlRate >= 0 ? '+' : '') + pnlRate.toFixed(1) + '%</div>' +
       '<div class="pnl hide-mobile">' +
         '<div class="amt ' + (pnl >= 0 ? 'up' : 'down') + '">' + (pnl >= 0 ? '+' : '') + formatMoney(pnl) + '</div>' +
@@ -1362,20 +1363,17 @@ async function loadData() {
   });
 
   if (updatedFunds.length === 0) {
-    listEl.innerHTML = '<div class="loading" style="padding:30px">' +
-      '<div style="font-size:40px;margin-bottom:12px">📡</div>' +
-      '<div style="font-weight:500;margin-bottom:8px">暂无实时数据</div>' +
-      '<div style="font-size:13px;color:var(--text-dim);line-height:1.8">当前网络可能无法访问天天基金网 😅<br>' +
-      '持仓数据来自本地缓存，实时净值将在可访问的网络下自动加载</div></div>';
+    // 即使无网络也要用 FUNDS 默认数据渲染，只是净值显示为 "--"
+    const now = new Date();
+    listEl.innerHTML = '<div style="padding:12px 20px;font-size:13px;color:var(--yellow);background:rgba(234,179,8,0.08);border-bottom:1px solid var(--border);text-align:center">📡 实时净值不可用（使用缓存数据）</div>';
     updateNetworkBanner(FUNDS, 0);
-
-    // 即使无网络也要渲染页面其他部分
-    renderStats([]);
-    renderSectorTags([]);
-    renderFundRows([], 0);
-    renderRadar([]);
-    renderStrategies([]);
-    renderSectors([]);
+    const totalAmt = FUNDS.reduce((s, f) => s + (f.amount || 0), 0);
+    renderStats(FUNDS);
+    renderSectorTags(FUNDS);
+    renderFundRows(FUNDS, totalAmt);
+    renderRadar(FUNDS);
+    renderStrategies(FUNDS);
+    renderSectors(FUNDS);
     renderIndices(null);
     renderOpportunity(null);
     renderPool();
