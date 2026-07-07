@@ -89,7 +89,7 @@
   }
   .table-header {
     display: grid;
-    grid-template-columns: 30px 1.5fr 0.9fr 0.7fr 0.7fr 0.7fr 0.7fr 0.5fr;
+    grid-template-columns: 30px 1.5fr 0.9fr 0.7fr 0.7fr 0.7fr 0.55fr 0.55fr 0.5fr;
     padding: 10px 14px; font-size: 11px; color: var(--text-dim);
     border-bottom: 1px solid var(--border); gap: 4px; align-items: center;
   }
@@ -101,7 +101,7 @@
   .sort-arrow { font-size: 9px; margin-left: 3px; }
   .fund-row {
     display: grid;
-    grid-template-columns: 30px 1.5fr 0.9fr 0.7fr 0.7fr 0.7fr 0.7fr 0.5fr;
+    grid-template-columns: 30px 1.5fr 0.9fr 0.7fr 0.7fr 0.7fr 0.55fr 0.55fr 0.5fr;
     padding: 10px 14px; font-size: 12px; border-bottom: 1px solid var(--border);
     transition: background 0.15s; cursor: pointer; gap: 4px; align-items: center;
   }
@@ -116,6 +116,7 @@
   .fund-row .chg { text-align: right; font-weight: 600; }
   .fund-row .pnl { text-align: right; }
   .fund-row .weight { text-align: right; }
+  .fund-row .trend-cell { text-align: center; }
   .fund-row .signal { text-align: center; font-size: 14px; }
   .fund-row .action { text-align: center; }
 
@@ -282,6 +283,7 @@
       <div class="sortable" data-sort="nav" onclick="doSort('nav',this)">净值 <span class="sort-arrow"></span></div>
       <div class="sortable active" data-sort="change" onclick="doSort('change',this)">日涨跌 <span class="sort-arrow">▼</span></div>
       <div class="sortable hide-m" data-sort="pnl" onclick="doSort('pnl',this)">持有收益 <span class="sort-arrow"></span></div>
+      <div class="hide-m">趋势</div>
       <div class="hide-m">占比</div>
       <div>信号</div>
     </div>
@@ -603,7 +605,7 @@ function renderTable(data, totalAmt) {
     const signal = getEntrySignal(f);
     const advice = !isHoldings ? {label:'👁 关注',cls:'watch'} : getAdvice(f);
 
-    return `<div class="fund-row" onclick="window.open('https://fund.eastmoney.com/${f.code}.html','_blank')">
+    return `<div class="fund-row" data-code="${f.code}" onclick="window.open('https://fund.eastmoney.com/${f.code}.html','_blank')">
       <div class="idx">${i+1}</div>
       <div class="name">${f.name||f.code}<span class="code">${f.code}</span>${f.sector?`<span class="sector">${f.sector}</span>`:''}</div>
       <div class="amt">${isHoldings ? fmtMoney(f.amount||0) : '—'}</div>
@@ -611,6 +613,7 @@ function renderTable(data, totalAmt) {
       <div class="chg ${chg!==null?(chg>=0?'up':'down'):''}">${chg!==null?(chg>=0?'+':'')+chg.toFixed(2)+'%':'--'}</div>
       ${isHoldings ? `<div class="pnl hide-m ${pnl>=0?'up':'down'}">${pnl>=0?'+':''}${fmtMoney(pnl)}<br><span style="font-size:10px">${fmtPct(pnlRate)}</span></div>` : '<div class="pnl hide-m" style="color:var(--text-dim)">—</div>'}
       ${isHoldings ? `<div class="weight hide-m">${weight.toFixed(1)}%<div class="progress-bar"><div class="fill" style="width:${weight}%;background:${weight>20?'var(--red)':'var(--blue)'}"></div></div></div>` : '<div class="weight hide-m" style="color:var(--text-dim)">—</div>'}
+      <div class="trend-cell hide-m">${sparkline(f.hist||[], 55, 20, (parseFloat(f.change||0)>=0))}</div>
       <div class="signal" title="${signal.tip}">${signal.icon}</div>
     </div>`;
   }).join('');
@@ -829,9 +832,11 @@ async function init() {
   refreshData();
   // Auto-refresh every 5 min
   setInterval(refreshData, 300000);
+  setTimeout(function() { injectSparklines(); loadAllTrends(HOLDINGS); }, 2500);
 }
 
 init();
 </script>
+<script src="sparkline.js"></script>
 </body>
 </html>
