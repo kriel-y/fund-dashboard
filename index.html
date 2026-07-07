@@ -745,40 +745,6 @@ function jsonpRequest(url, timeout = 6000) {
 //  FETCH FUND NAV — 实时净值
 // ===================================================================
 async function fetchFundNav(code) {
-  // 使用同源代理（如果通过 fund_proxy.py 访问）
-  if (USE_LOCAL_PROXY) {
-    try {
-      const resp = await fetch(`/api/fund/${code}`);
-      const text = await resp.text();
-      const match = text.match(/\{.*\}/);
-      if (match) {
-        const data = JSON.parse(match[0]);
-        if (data && data.gsz !== undefined && data.gsz !== '--') {
-          return {
-            nav: parseFloat(data.gsz) || 0,
-            navPrev: parseFloat(data.dwjz) || 0,
-            change: parseFloat(data.gszzl) || 0,
-            navDate: data.jzrq || '',
-            name: data.name || code,
-          };
-        }
-        // lsjz format
-        if (data && data.Data && data.Data.LSJZList) {
-          const list = data.Data.LSJZList;
-          const latest = list[0];
-          const prev = list[1] || list[0];
-          return {
-            nav: parseFloat(latest.NAV) || 0,
-            navPrev: parseFloat(prev.NAV) || 0,
-            change: prev ? (parseFloat(latest.NAV) - parseFloat(prev.NAV)) / parseFloat(prev.NAV) * 100 : 0,
-            navDate: latest.FSRQ || '',
-            name: code,
-          };
-        }
-      }
-    } catch(e) {}
-  }
-  async function fetchFundNav(code) {
     // 0. 优先使用预计算净值（cron 定时更新，离线可用）
     try {
       if (typeof PRECOMPUTED_NAV !== 'undefined' && PRECOMPUTED_NAV[code]) {
