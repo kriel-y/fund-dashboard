@@ -436,42 +436,69 @@ async function fetchFundNav(code) {
 }
 
 // ================================================================
-// FETCH INDICES via Sina API (reliable cross-origin)
+// FETCH INDICES — multi-fallback: precomputed JSON → Sina → eastmoney
 // ================================================================
 const INDEX_CODES = [
-  {key:'s_sh000001',name:'上证指数'},
-  {key:'s_sz399001',name:'深证成指'},
-  {key:'s_sz399006',name:'创业板指'},
-  {key:'s_sh000688',name:'科创50'},
-  {key:'s_sh000300',name:'沪深300'},
-  {key:'s_sh000016',name:'上证50'},
-  {key:'s_sz399933',name:'中证1000'},
+  {key:'1.000001',sina:'s_sh000001',name:'上证指数'},
+  {key:'0.399001',sina:'s_sz399001',name:'深证成指'},
+  {key:'0.399006',sina:'s_sz399006',name:'创业板指'},
+  {key:'1.000688',sina:'s_sh000688',name:'科创50'},
+  {key:'1.000300',sina:'s_sh000300',name:'沪深300'},
+  {key:'1.000016',sina:'s_sh000016',name:'上证50'},
+  {key:'0.399933',sina:'s_sz399852',name:'中证1000'},
 ];
 
-function fetchIndices() {
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'https://hq.sinajs.cn/list=' + INDEX_CODES.map(c=>c.key).join(',');
-    script.onload = () => {
-      const indices = [];
-      INDEX_CODES.forEach(c => {
-        const raw = window['hq_str_' + c.key];
-        if (raw) {
-          const parts = raw.split(',');
-          indices.push({
-            name: c.name,
-            price: parseFloat(parts[1]) || 0,
-            changeAmt: parseFloat(parts[2]) || 0,
-            changePct: parseFloat(parts[3]) || 0,
+async function fetchIndices() {
+  // 1. Precomputed index JSON (most reliable, cron-updated daily)
+  try {
+    const resp = await fetch('precomputed_index.json', {cache:'no-cache'});
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.length > 0) return data;
+    }
+  } catch(_) {}
+
+  // 2. Sina API via script tag
+  try {
+    const result = await new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://hq.sinajs.cn/list=' + INDEX_CODES.map(c=>c.sina).join(',');
+      let done = false;
+      const finish = (val) => { if(done)return; done=true; clearTimeout(t); script.remove(); resolve(val); };
+      const t = setTimeout(() => finish(null), 8000);
+      script.onload = () => {
+        setTimeout(() => {
+          const indices = [];
+          INDEX_CODES.forEach(c => {
+            const raw = window['hq_str_' + c.sina];
+            if (raw) {
+              const parts = raw.split(',');
+              indices.push({name:c.name, price:parseFloat(parts[1])||0, changeAmt:parseFloat(parts[2])||0, changePct:parseFloat(parts[3])||0});
+            }
           });
-        }
-      });
-      script.remove();
-      resolve(indices.length>0 ? indices : null);
-    };
-    script.onerror = () => { script.remove(); resolve(null); };
-    document.head.appendChild(script);
-  });
+          finish(indices.length>0 ? indices : null);
+        }, 200);
+      };
+      script.onerror = () => finish(null);
+      document.head.appendChild(script);
+    });
+    if (result) return result;
+  } catch(_) {}
+
+  // 3. eastmoney JSONP fallback
+  try {
+    const secids = INDEX_CODES.map(c=>c.key).join(',');
+    const data = await jsonp(`https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f2,f3,f4,f12,f14&secids=${secids}`, 8000);
+    if (data && data.data && data.data.diff) {
+      const nameMap = {}; INDEX_CODES.forEach(c => { nameMap[c.key] = c.name; });
+      return data.data.diff.map(item => ({
+        name: nameMap[item.f12] || item.f14 || item.f12,
+        price: item.f2, changePct: item.f3, changeAmt: item.f4,
+      }));
+    }
+  } catch(_) {}
+
+  return null;
 }
 
 // ================================================================
