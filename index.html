@@ -660,8 +660,10 @@ function jsonpRequest(url, timeout = 6000) {
 //  FETCH FUND NAV — 实时净值
 // ===================================================================
 async function fetchFundNav(code) {
-  // 尝试顺序: 1. Cloudflare Worker 代理 (HTTPS)  2. 直接 fundgz (HTTP)  3. 历史净值API
-  const urls = [];
+  // 尝试顺序: 1. 历史净值API (HTTPS, 最稳定)  2. Cloudflare Worker (如配置)  3. fundgz
+  const urls = [
+    `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=5`,
+  ];
   if (PROXY_URL) urls.push(`${PROXY_URL}/fund/${code}`);
   urls.push(`https://fundgz.1234567.com.cn/js/${code}.js`);
   urls.push(`http://fundgz.1234567.com.cn/js/${code}.js`);
@@ -669,6 +671,7 @@ async function fetchFundNav(code) {
   for (const url of urls) {
     try {
       const data = await jsonpRequest(url, 5000);
+      // fundgz format
       if (data && data.gsz !== undefined) {
         return {
           nav: parseFloat(data.gsz) || 0,
@@ -678,27 +681,21 @@ async function fetchFundNav(code) {
           name: data.name || code,
         };
       }
+      // lsjz format (历史净值API)
+      if (data && data.Data && data.Data.LSJZList && data.Data.LSJZList.length > 0) {
+        const list = data.Data.LSJZList;
+        const latest = list[0];
+        const prev = list[1] || list[0];
+        return {
+          nav: parseFloat(latest.NAV) || 0,
+          navPrev: parseFloat(prev.NAV) || 0,
+          change: prev ? ((parseFloat(latest.NAV) - parseFloat(prev.NAV)) / parseFloat(prev.NAV) * 100) : 0,
+          navDate: latest.FSRQ || '',
+          name: code,
+        };
+      }
     } catch(e) {}
   }
-
-  // 最终 fallback：历史净值 API
-  try {
-    const data = await jsonpRequest(
-      `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=5`, 5000
-    );
-    if (data.Data && data.Data.LSJZList && data.Data.LSJZList.length > 0) {
-      const list = data.Data.LSJZList;
-      const latest = list[0];
-      const prev = list[1] || list[0];
-      return {
-        nav: parseFloat(latest.NAV) || 0,
-        navPrev: parseFloat(prev.NAV) || 0,
-        change: prev ? ((parseFloat(latest.NAV) - parseFloat(prev.NAV)) / parseFloat(prev.NAV) * 100) : 0,
-        navDate: latest.FSRQ || '',
-        name: code,
-      };
-    }
-  } catch(e2) {}
   return null;
 }
 
