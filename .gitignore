@@ -1,0 +1,4 @@
+.git-credentials
+*.log
+daily-advice.json
+.git/
