@@ -400,12 +400,25 @@ function jsonp(url, timeout=6000) {
 // FETCH FUND NAV
 // ================================================================
 async function fetchFundNav(code) {
-  // 1. Precomputed
-  if (PRECOMPUTED_NAV[code]) {
-    const d = PRECOMPUTED_NAV[code];
-    return {nav:d.nav, navPrev:d.navPrev||d.nav, change:d.change||0, navDate:d.navDate||''};
-  }
-  // 2. Local JSON
+  // 1. fundgz live API — try first for real-time data
+  try {
+    const data = await jsonp(`https://fundgz.1234567.com.cn/js/${code}.js`, 5000);
+    if (data && data.gsz !== undefined) {
+      navSource = 'live';
+      return {nav:parseFloat(data.gsz)||0, navPrev:parseFloat(data.dwjz)||0, change:parseFloat(data.gszzl)||0, navDate:data.jzrq||''};
+    }
+  } catch(_) {}
+  // 2. History API (lsjz)
+  try {
+    const data = await jsonp(`https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=5`, 5000);
+    if (data && data.Data && data.Data.LSJZList && data.Data.LSJZList.length>0) {
+      const list = data.Data.LSJZList;
+      const latest = list[0], prev = list[1]||list[0];
+      navSource = 'live';
+      return {nav:parseFloat(latest.NAV)||0, navPrev:parseFloat(prev.NAV)||0, change:prev?((parseFloat(latest.NAV)-parseFloat(prev.NAV))/parseFloat(prev.NAV)*100):0, navDate:latest.FSRQ||''};
+    }
+  } catch(_) {}
+  // 3. Local JSON fallback
   try {
     const resp = await fetch('precomputed_nav.json', {cache:'no-cache'});
     if (resp.ok) {
@@ -416,24 +429,14 @@ async function fetchFundNav(code) {
       }
     }
   } catch(_) {}
-  // 3. fundgz API (JSONP)
-  try {
-    const data = await jsonp(`https://fundgz.1234567.com.cn/js/${code}.js`, 5000);
-    if (data && data.gsz !== undefined) {
-      return {nav:parseFloat(data.gsz)||0, navPrev:parseFloat(data.dwjz)||0, change:parseFloat(data.gszzl)||0, navDate:data.jzrq||''};
-    }
-  } catch(_) {}
-  // 4. History API (JSONP)
-  try {
-    const data = await jsonp(`https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=5`, 5000);
-    if (data && data.Data && data.Data.LSJZList && data.Data.LSJZList.length>0) {
-      const list = data.Data.LSJZList;
-      const latest = list[0], prev = list[1]||list[0];
-      return {nav:parseFloat(latest.NAV)||0, navPrev:parseFloat(prev.NAV)||0, change:prev?((parseFloat(latest.NAV)-parseFloat(prev.NAV))/parseFloat(prev.NAV)*100):0, navDate:latest.FSRQ||''};
-    }
-  } catch(_) {}
+  // 4. Inline precomputed (hardcoded)
+  if (PRECOMPUTED_NAV[code]) {
+    const d = PRECOMPUTED_NAV[code];
+    return {nav:d.nav, navPrev:d.navPrev||d.nav, change:d.change||0, navDate:d.navDate||''};
+  }
   return null;
 }
+var navSource = 'cache';
 
 // ================================================================
 // FETCH INDICES — multi-fallback: precomputed JSON → Sina → eastmoney
