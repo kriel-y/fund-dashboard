@@ -560,6 +560,12 @@
 
 <script>
 // ===================================================================
+//  CONFIG — 可在此设置你的 Cloudflare Worker 代理地址
+// ===================================================================
+const PROXY_URL = '';  // 例如: 'https://fund-proxy.xxx.workers.dev'
+// 留空则不使用代理，直接请求 fundgz（在 HTTPS 页面上可能被浏览器拦截）
+
+// ===================================================================
 //  FUND DATA — 用户持仓基金（已确认代码）
 // ===================================================================
 const FUNDS = [
@@ -654,35 +660,46 @@ function jsonpRequest(url, timeout = 6000) {
 //  FETCH FUND NAV — 实时净值
 // ===================================================================
 async function fetchFundNav(code) {
-  try {
-    const data = await jsonpRequest(`https://fundgz.1234567.com.cn/js/${code}.js`, 6000);
-    return {
-      nav: parseFloat(data.gsz) || 0,
-      navPrev: parseFloat(data.dwjz) || 0,
-      change: parseFloat(data.gszzl) || 0,
-      navDate: data.jzrq || '',
-      name: data.name || code,
-    };
-  } catch(e) {
+  // 尝试顺序: 1. Cloudflare Worker 代理 (HTTPS)  2. 直接 fundgz (HTTP)  3. 历史净值API
+  const urls = [];
+  if (PROXY_URL) urls.push(`${PROXY_URL}/fund/${code}`);
+  urls.push(`https://fundgz.1234567.com.cn/js/${code}.js`);
+  urls.push(`http://fundgz.1234567.com.cn/js/${code}.js`);
+
+  for (const url of urls) {
     try {
-      const data = await jsonpRequest(
-        `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=5`, 5000
-      );
-      if (data.Data && data.Data.LSJZList && data.Data.LSJZList.length > 0) {
-        const list = data.Data.LSJZList;
-        const latest = list[0];
-        const prev = list[1] || list[0];
+      const data = await jsonpRequest(url, 5000);
+      if (data && data.gsz !== undefined) {
         return {
-          nav: parseFloat(latest.NAV) || 0,
-          navPrev: parseFloat(prev.NAV) || 0,
-          change: prev ? ((parseFloat(latest.NAV) - parseFloat(prev.NAV)) / parseFloat(prev.NAV) * 100) : 0,
-          navDate: latest.FSRQ || '',
-          name: code,
+          nav: parseFloat(data.gsz) || 0,
+          navPrev: parseFloat(data.dwjz) || 0,
+          change: parseFloat(data.gszzl) || 0,
+          navDate: data.jzrq || '',
+          name: data.name || code,
         };
       }
-    } catch(e2) {}
-    return null;
+    } catch(e) {}
   }
+
+  // 最终 fallback：历史净值 API
+  try {
+    const data = await jsonpRequest(
+      `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=5`, 5000
+    );
+    if (data.Data && data.Data.LSJZList && data.Data.LSJZList.length > 0) {
+      const list = data.Data.LSJZList;
+      const latest = list[0];
+      const prev = list[1] || list[0];
+      return {
+        nav: parseFloat(latest.NAV) || 0,
+        navPrev: parseFloat(prev.NAV) || 0,
+        change: prev ? ((parseFloat(latest.NAV) - parseFloat(prev.NAV)) / parseFloat(prev.NAV) * 100) : 0,
+        navDate: latest.FSRQ || '',
+        name: code,
+      };
+    }
+  } catch(e2) {}
+  return null;
 }
 
 // ===================================================================
