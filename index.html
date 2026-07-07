@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐂 基金投资追踪 Dashboard · 全功能版</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d28;
+    --border: #2a2d3a;
+    --text: #e1e4ed;
+    --text-dim: #8b8fa3;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --orange: #f97316;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 20px;
+    min-height: 100vh;
+  }
+  .container { max-width: 1440px; margin: 0 auto; }
+
+  /* ===== Header ===== */
+  .header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+  }
+  .header-left h1 { font-size: 24px; font-weight: 700; }
+  .header-left h1 span { color: var(--yellow); }
+  .header-left .subtitle { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .header-right {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  }
+  .header-right .date-display { font-size: 13px; color: var(--text-dim); }
+  .last-update { font-size: 12px; color: var(--text-dim); }
+
+  /* ===== Stats ===== */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; position: relative; overflow: hidden;
+  }
+  .stat-card .label { font-size: 13px; color: var(--text-dim); margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; }
+  .stat-card .sub { font-size: 13px; margin-top: 4px; }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 80px; height: 80px; border-radius: 50%;
+    opacity: 0.08; transform: translate(20px, -20px);
+  }
+  .stat-card.total::before { background: var(--blue); }
+  .stat-card.pnl::before { background: var(--green); }
+  .stat-card.daily::before { background: var(--yellow); }
+  .stat-card.count::before { background: var(--purple); }
+  .up { color: var(--red); }
+  .down { color: var(--green); }
+  .neutral { color: var(--text-dim); }
+
+  /* ===== Top Row: Index Dashboard + Daily Strategy ===== */
+  .top-row {
+    display: grid; grid-template-columns: 1fr 320px; gap: 16px; margin-bottom: 24px;
+  }
+  .index-dashboard {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+  }
+  .index-dashboard .section-label {
+    font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--cyan);
+  }
+  .index-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  }
+  .index-item {
+    background: var(--bg); border-radius: 8px; padding: 10px 12px;
+    border: 1px solid transparent; transition: border-color 0.2s;
+  }
+  .index-item:hover { border-color: var(--border); }
+  .index-item .idx-name { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  .index-item .idx-price { font-size: 16px; font-weight: 700; }
+  .index-item .idx-change { font-size: 12px; margin-top: 2px; }
+  .index-item .idx-chgval { font-size: 11px; color: var(--text-dim); }
+
+  /* ===== Daily Strategy Card ===== */
+  .daily-strategy-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    position: relative;
+  }
+  .daily-strategy-card .section-label {
+    font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--yellow);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .daily-strategy-card .refresh-btn {
+    background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px;
+    padding: 2px 6px; border-radius: 4px; transition: color 0.2s;
+  }
+  .daily-strategy-card .refresh-btn:hover { color: var(--yellow); }
+  .daily-strategy-card .ds-sentiment {
+    font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+  }
+  .daily-strategy-card .ds-suggestion {
+    font-size: 18px; font-weight: 700; margin-bottom: 8px;
+  }
+  .daily-strategy-card .ds-detail {
+    font-size: 12px; color: var(--text-dim); line-height: 1.7;
+  }
+  .daily-strategy-card .ds-detail li { list-style: none; }
+  .daily-strategy-card .ds-detail li::before { content: '• '; color: var(--yellow); }
+  .daily-strategy-card .ds-waiting {
+    text-align: center; padding: 20px 0; color: var(--text-dim); font-size: 13px;
+  }
+  .ds-time-label { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+
+  /* ===== Sector Tags ===== */
+  .sector-tags {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;
+  }
+  .sector-tag {
+    background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+    padding: 6px 14px; font-size: 12px; color: var(--text-dim);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .sector-tag:hover { border-color: var(--blue); color: var(--text); }
+  .sector-tag.active { border-color: var(--yellow); color: var(--yellow); }
+
+  /* ===== Table ===== */
+  .table-container {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; margin-bottom: 24px;
+  }
+  .table-header {
+    display: grid;
+    grid-template-columns: 36px 1.6fr 0.8fr 0.9fr 0.8fr 0.7fr 0.7fr 1fr 0.8fr 0.7fr;
+    padding: 12px 16px; font-size: 11px; color: var(--text-dim);
+    border-bottom: 1px solid var(--border); text-transform: uppercase;
+    letter-spacing: 0.5px; gap: 6px;
+  }
+  .fund-row {
+    display: grid;
+    grid-template-columns: 36px 1.6fr 0.8fr 0.9fr 0.8fr 0.7fr 0.7fr 1fr 0.8fr 0.7fr;
+    padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border);
+    transition: background 0.15s; cursor: pointer; gap: 6px; align-items: center;
+  }
+  .fund-row:last-child { border-bottom: none; }
+  .fund-row:hover { background: rgba(255,255,255,0.03); }
+  .fund-row .idx { color: var(--text-dim); font-size: 11px; }
+  .fund-row .name { font-weight: 500; display: flex; flex-direction: column; }
+  .fund-row .name .code { font-size: 10px; color: var(--text-dim); font-weight: 400; margin-top: 1px; }
+  .fund-row .name .sector-t { font-size: 10px; color: var(--blue); margin-top: 1px; }
+  .fund-row .amt { text-align: right; font-weight: 600; font-size: 13px; }
+  .fund-row .nav { text-align: right; font-size: 12px; }
+  .fund-row .chg { text-align: right; font-weight: 600; font-size: 13px; }
+  .fund-row .pct { text-align: right; font-weight: 600; font-size: 13px; }
+  .fund-row .pnl { text-align: right; }
+  .fund-row .pnl .amt { font-weight: 600; font-size: 13px; }
+  .fund-row .pnl .pct { font-size: 11px; }
+  .fund-row .weight { text-align: right; font-size: 12px; }
+  .fund-row .signal { text-align: center; font-size: 16px; }
+  .fund-row .action { text-align: center; }
+
+  .badge {
+    display: inline-block; padding: 2px 7px; border-radius: 4px;
+    font-size: 10px; font-weight: 500; white-space: nowrap;
+  }
+  .badge-hold { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-add { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-cut { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-watch { background: rgba(234,179,8,0.15); color: var(--yellow); }
+
+  .progress-bar {
+    width: 100%; height: 3px; background: var(--border); border-radius: 2px; margin-top: 4px;
+  }
+  .progress-bar .fill {
+    height: 100%; border-radius: 2px; transition: width 0.5s;
+  }
+
+  .section-title {
+    font-size: 17px; font-weight: 600; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ===== Market Radar + Opportunity together ===== */
+  .radar-opp-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+  }
+
+  /* ===== Market Radar ===== */
+  .radar-grid {
+    display: grid; grid-template-columns: 1fr; gap: 12px;
+  }
+  .radar-item {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .radar-item .title { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .radar-item .signal { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .radar-item .desc { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+
+  /* ===== Market Opportunity ===== */
+  .opportunity-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px;
+  }
+  .opportunity-card .section-label {
+    font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--orange);
+  }
+  .hot-sector-list {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+  }
+  .hot-sector-item {
+    background: var(--bg); border-radius: 6px; padding: 6px 10px;
+    font-size: 11px; display: flex; align-items: center; gap: 6px;
+  }
+  .hot-sector-item .hs-name { color: var(--text); }
+  .hot-sector-item .hs-change.up { color: var(--red); }
+  .hot-sector-item .hs-change.down { color: var(--green); }
+  .opp-fund-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; background: var(--bg); border-radius: 8px; margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .opp-fund-item .opp-name { display: flex; flex-direction: column; }
+  .opp-fund-item .opp-name .opp-code { font-size: 10px; color: var(--text-dim); }
+  .opp-fund-item .opp-name .opp-sector { font-size: 10px; color: var(--cyan); }
+  .opp-fund-item .opp-advice { font-size: 11px; white-space: nowrap; }
+  .opp-section-label { font-size: 12px; color: var(--text-dim); margin: 10px 0 6px; }
+
+  /* ===== Strategy ===== */
+  .strategy-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+  }
+  .strategy-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px;
+  }
+  .strategy-card h3 { font-size: 14px; margin-bottom: 10px; color: var(--yellow); }
+  .strategy-card ul { list-style: none; font-size: 12px; color: var(--text-dim); line-height: 2; }
+  .strategy-card ul li::before { content: '• '; color: var(--yellow); }
+
+  /* ===== Sector Analysis ===== */
+  .sector-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+  }
+  .sector-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .sector-card .sector-name { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .sector-card .sector-stats { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; }
+  .sector-card .sector-view {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 0; font-size: 12px; border-bottom: 1px solid var(--border);
+  }
+  .sector-card .sector-view:last-child { border-bottom: none; }
+
+  /* ===== Recommended Fund Pool ===== */
+  .pool-section { margin-bottom: 24px; }
+  .pool-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;
+  }
+  .pool-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; transition: border-color 0.2s;
+  }
+  .pool-card:hover { border-color: var(--blue); }
+  .pool-card .pool-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  .pool-card .pool-code { font-size: 11px; color: var(--text-dim); }
+  .pool-card .pool-sector {
+    display: inline-block; font-size: 10px; background: rgba(59,130,246,0.12);
+    color: var(--blue); padding: 2px 8px; border-radius: 10px; margin: 4px 0;
+  }
+  .pool-card .pool-footer {
+    display: flex; justify-content: space-between; align-items: center; margin-top: 8px;
+  }
+  .pool-card .pool-desc { font-size: 11px; color: var(--text-dim); }
+  .pool-card .pool-follow-btn {
+    font-size: 11px; background: var(--border); border: none; color: var(--text);
+    padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: background 0.2s;
+  }
+  .pool-card .pool-follow-btn:hover { background: var(--blue); }
+  .pool-card .pool-follow-btn.followed { background: rgba(34,197,94,0.2); color: var(--green); }
+
+  /* ===== Loading ===== */
+  .loading {
+    text-align: center; padding: 40px; color: var(--text-dim);
+  }
+  .loading .spinner {
+    display: inline-block; width: 32px; height: 32px;
+    border: 3px solid var(--border); border-top-color: var(--yellow);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== Modal ===== */
+  .modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    justify-content: center; align-items: center; z-index: 1000;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 32px; width: 90%; max-width: 480px; max-height: 80vh; overflow-y: auto;
+  }
+  .modal h2 { margin-bottom: 16px; font-size: 18px; }
+  .modal input, .modal select {
+    width: 100%; padding: 10px 14px; margin-bottom: 12px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 14px;
+  }
+  .modal input:focus { outline: none; border-color: var(--blue); }
+  .modal .btn-group { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  .modal .btn {
+    padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 14px; transition: opacity 0.2s;
+  }
+  .modal .btn-primary { background: var(--blue); color: white; }
+  .modal .btn-secondary { background: var(--border); color: var(--text); }
+  .modal .btn:hover { opacity: 0.85; }
+  .modal .hint { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; }
+
+  /* ===== Add Button ===== */
+  .add-btn {
+    position: fixed; bottom: 24px; right: 24px;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--blue); color: white; border: none;
+    font-size: 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+    transition: transform 0.2s; display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .add-btn:hover { transform: scale(1.1); }
+
+  /* ===== Scrollbar ===== */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ===== Network Banner ===== */
+  .network-banner {
+    padding: 8px 20px; font-size: 12px; text-align: center;
+    border-top: 1px solid var(--border);
+  }
+  .network-banner.ok { background: rgba(34,197,94,0.06); color: var(--green); }
+  .network-banner.warn { background: rgba(234,179,8,0.08); color: var(--yellow); }
+  .network-banner.fail { background: rgba(239,68,68,0.08); color: var(--red); }
+
+  /* ===== Tooltip ===== */
+  .signal-tip { cursor: help; position: relative; }
+  .signal-tip:hover::after {
+    content: attr(data-tip); position: absolute; bottom: 120%; left: 50%;
+    transform: translateX(-50%); background: #2a2d3a; color: var(--text);
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; white-space: nowrap;
+    z-index: 10; border: 1px solid var(--border);
+  }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1200px) {
+    .top-row { grid-template-columns: 1fr; }
+    .index-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 1024px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .strategy-grid { grid-template-columns: 1fr; }
+    .radar-opp-row { grid-template-columns: 1fr; }
+    .sector-grid { grid-template-columns: 1fr; }
+    .pool-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+    .table-header, .fund-row {
+      grid-template-columns: 30px 1.5fr 0.7fr 0.7fr 0.7fr 0.6fr;
+    }
+    .hide-mobile { display: none; }
+    .index-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .index-grid { grid-template-columns: repeat(2, 1fr); }
+    .header { flex-direction: column; gap: 8px; }
+    .header-right { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ==================== HEADER ==================== -->
+  <div class="header">
+    <div class="header-left">
+      <h1>🐂 <span>基金投资</span>追踪</h1>
+      <div class="subtitle">全市场机会 · 实时净值 · 智能策略</div>
+    </div>
+    <div class="header-right">
+      <div class="date-display" id="marketDate">📅 加载中...</div>
+      <div class="last-update" id="updateTime">⏳ 数据刷新中...</div>
+    </div>
+  </div>
+
+  <!-- ==================== STATS ==================== -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card total">
+      <div class="label">💰 总投入</div>
+      <div class="value" id="totalAmount">--</div>
+      <div class="sub" style="color:var(--text-dim)">持仓总市值</div>
+    </div>
+    <div class="stat-card pnl">
+      <div class="label">📈 累计收益</div>
+      <div class="value" id="totalPnl">--</div>
+      <div class="sub" id="totalPnlRate">--</div>
+    </div>
+    <div class="stat-card daily">
+      <div class="label">📊 今日盈亏</div>
+      <div class="value" id="dailyPnl">--</div>
+      <div class="sub" id="dailyDate">--</div>
+    </div>
+    <div class="stat-card count">
+      <div class="label">🎯 持仓基金</div>
+      <div class="value" id="fundCount">--</div>
+      <div class="sub" style="color:var(--text-dim)" id="sectorCount">-- 个行业板块</div>
+    </div>
+  </div>
+
+  <!-- ==================== TOP ROW: INDEX + DAILY STRATEGY ==================== -->
+  <div class="top-row">
+    <!-- Index Dashboard -->
+    <div class="index-dashboard">
+      <div class="section-label">📡 大盘指数看板</div>
+      <div class="index-grid" id="indexGrid">
+        <div class="loading" style="padding:10px;background:var(--bg);border-radius:8px;grid-column:1/-1">
+          <div class="spinner" style="width:20px;height:20px;margin:0 auto 6px"></div>
+          <div style="text-align:center;font-size:12px;color:var(--text-dim)">加载指数中...</div>
+        </div>
+      </div>
+    </div>
+    <!-- Daily Strategy -->
+    <div class="daily-strategy-card" id="dailyStrategyCard">
+      <div class="section-label">
+        📅 今日策略 · 14:50
+        <button class="refresh-btn" onclick="refreshDailyStrategy()" title="刷新策略">🔄</button>
+      </div>
+      <div id="dailyStrategyContent">
+        <div class="ds-waiting">
+          <div style="font-size:32px;margin-bottom:8px">📋</div>
+          <div>等待策略更新...</div>
+          <div style="font-size:11px;margin-top:6px;color:var(--text-dim)">点击刷新获取最新建议</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SECTOR FILTER TAGS ==================== -->
+  <div class="sector-tags" id="sectorTags"></div>
+
+  <!-- ==================== FUND TABLE ==================== -->
+  <div class="table-container">
+    <div class="table-header">
+      <div>#</div>
+      <div>基金名称</div>
+      <div style="text-align:right">持有金额</div>
+      <div style="text-align:right">最新净值</div>
+      <div style="text-align:right">日涨跌</div>
+      <div style="text-align:right" class="hide-mobile">涨跌幅</div>
+      <div style="text-align:right" class="hide-mobile">持有收益</div>
+      <div style="text-align:right" class="hide-mobile">持仓占比</div>
+      <div style="text-align:center">📡 信号</div>
+      <div style="text-align:center">建议</div>
+    </div>
+    <div id="fundList">
+      <div class="loading">
+        <div class="spinner"></div>
+        <div>正在加载基金数据...</div>
+      </div>
+    </div>
+    <div id="networkBanner" class="network-banner ok" style="display:none"></div>
+  </div>
+
+  <!-- ==================== MARKET RADAR + OPPORTUNITY ==================== -->
+  <div class="radar-opp-row">
+    <!-- Radar -->
+    <div>
+      <div class="section-title">📡 市场雷达</div>
+      <div class="radar-grid" id="radarGrid"></div>
+    </div>
+    <!-- Opportunity -->
+    <div>
+      <div class="section-title">🎯 市场机会推荐</div>
+      <div class="opportunity-card" id="opportunityCard">
+        <div class="section-label">🔥 热门板块排行 & 推荐基金</div>
+        <div id="opportunityContent">
+          <div class="loading" style="padding:20px">
+            <div class="spinner" style="width:24px;height:24px;margin:0 auto 8px"></div>
+            <div style="font-size:12px">加载板块数据...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== STRATEGY ==================== -->
+  <div class="section-title">🧠 投资策略建议</div>
+  <div class="strategy-grid" id="strategyGrid"></div>
+
+  <!-- ==================== SECTOR ANALYSIS ==================== -->
+  <div class="section-title">🏭 行业板块分析</div>
+  <div class="sector-grid" id="sectorGrid"></div>
+
+  <!-- ==================== RECOMMENDED FUND POOL ==================== -->
+  <div class="pool-section">
+    <div class="section-title">⭐ 潜力基金池 · 全市场关注</div>
+    <div class="pool-grid" id="poolGrid"></div>
+  </div>
+
+</div>
+
+<!-- Add Fund Button -->
+<button class="add-btn" onclick="showAddModal()" title="添加基金">+</button>
+
+<!-- Add Fund Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <h2>➕ 添加基金</h2>
+    <div class="hint">输入基金代码和持有金额，板块可选填</div>
+    <input type="text" id="fundCodeInput" placeholder="基金代码 (6位)" maxlength="6" oninput="this.value=this.value.replace(/\D/g,'')">
+    <input type="number" id="fundAmountInput" placeholder="持有金额 (元)" min="0">
+    <select id="fundSectorInput">
+      <option value="">选择行业板块（可选）</option>
+      <option value="港股科技">港股科技</option>
+      <option value="芯片半导体">芯片半导体</option>
+      <option value="沪深300">沪深300</option>
+      <option value="红利低波">红利低波</option>
+      <option value="资源周期">资源周期</option>
+      <option value="化工">化工</option>
+      <option value="电网设备">电网设备</option>
+      <option value="石油天然气">石油天然气</option>
+      <option value="煤炭">煤炭</option>
+      <option value="混合型">混合型</option>
+      <option value="消费">消费</option>
+      <option value="医药">医药</option>
+      <option value="新能源">新能源</option>
+      <option value="军工">军工</option>
+      <option value="AI科技">AI/科技</option>
+      <option value="黄金">黄金</option>
+      <option value="债券">债券</option>
+      <option value="海外">海外</option>
+      <option value="其他">其他</option>
+    </select>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="hideAddModal()">取消</button>
+      <button class="btn btn-primary" onclick="addFund()">添加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================================================================
+//  FUND DATA — 用户持仓基金（已确认代码）
+// ===================================================================
+const FUNDS = [
+  { code: '022122', name: '国泰海通中证香港科技A', amount: 4706, sector: '港股科技', pnl: -494, pnlRate: -9.5 },
+  { code: '021642', name: '富国资源精选混合发起式A', amount: 2285, sector: '资源周期', pnl: -48, pnlRate: -2.1 },
+  { code: '027575', name: '天弘上证科创板芯片A', amount: 5923, sector: '芯片半导体', pnl: 123, pnlRate: 2.1 },
+  { code: '008390', name: '国联安沪深300ETF联接A', amount: 3940, sector: '沪深300', pnl: 140, pnlRate: 3.7 },
+  { code: '008163', name: '南方标普红利低波50ETF联接A', amount: 2859, sector: '红利低波', pnl: -32, pnlRate: -1.1 },
+  { code: '020602', name: '易方达中证红利低波动ETF联接A', amount: 3481, sector: '红利低波', pnl: -80, pnlRate: -2.2 },
+  { code: '015896', name: '天弘中证细分化工产业主题ETF联接A', amount: 3947, sector: '化工', pnl: 47, pnlRate: 1.2 },
+  { code: '025856', name: '华夏中证电网设备主题ETF联接A', amount: 2475, sector: '电网设备', pnl: -25, pnlRate: -1.0 },
+  { code: '019827', name: '鹏华国证石油天然气ETF联接A', amount: 2513, sector: '石油天然气', pnl: 13, pnlRate: 0.5 },
+  { code: '008279', name: '国泰中证煤炭ETF联接A', amount: 4341, sector: '煤炭', pnl: 41, pnlRate: 1.0 },
+  { code: '026685', name: '永赢锐见成长混合C', amount: 883, sector: '混合型', pnl: -17, pnlRate: -1.9 },
+];
+
+// ===================================================================
+//  RECOMMENDED FUND POOL — 全市场潜力基金
+// ===================================================================
+const RECOMMENDED_POOL = [
+  // 科创板/半导体
+  { code: '007817', name: '国泰半导体芯片A', sector: '芯片半导体', desc: '半导体行业龙头基金' },
+  { code: '012552', name: '天弘芯片产业ETF联接A', sector: '芯片半导体', desc: '中证芯片产业指数' },
+  // 新能源
+  { code: '001790', name: '国泰智能汽车', sector: '新能源', desc: '智能汽车产业链' },
+  { code: '003834', name: '华夏能源革新', sector: '新能源', desc: '新能源全产业链布局' },
+  // AI/科技
+  { code: '160626', name: '鹏华信息科技', sector: 'AI科技', desc: '信息科技主题' },
+  { code: '001986', name: '前海开源人工智能', sector: 'AI科技', desc: '人工智能赛道' },
+  // 消费
+  { code: '110011', name: '易方达中小盘', sector: '消费', desc: '张坤管理·长期业绩优异' },
+  { code: '005827', name: '易方达蓝筹精选', sector: '消费', desc: '蓝筹龙头配置' },
+  // 医药
+  { code: '003095', name: '中欧医疗健康A', sector: '医药', desc: '葛兰管理·医疗龙头' },
+  { code: '001717', name: '工银前沿医疗', sector: '医药', desc: '前沿医疗赛道' },
+  // 军工
+  { code: '005609', name: '富国军工主题', sector: '军工', desc: '军工行业精选' },
+  { code: '001838', name: '国投瑞银国家安全', sector: '军工', desc: '国家安全主题' },
+  // 黄金
+  { code: '002610', name: '博时黄金ETF联接A', sector: '黄金', desc: '黄金避险配置' },
+  { code: '000217', name: '华安黄金ETF联接A', sector: '黄金', desc: '黄金现货合约' },
+  // 债券
+  { code: '110017', name: '易方达增强回报A', sector: '债券', desc: '增强型债券基金' },
+  { code: '485111', name: '工银双利债券A', sector: '债券', desc: '双利债券策略' },
+  // 海外
+  { code: '000988', name: '嘉实全球互联网', sector: '海外', desc: '全球互联网龙头' },
+  { code: '513050', name: '易方达中证海外互联', sector: '海外', desc: '中概互联ETF联接' },
+  // 宽基
+  { code: '005761', name: '华宝中证100', sector: '沪深300', desc: '中证100增强' },
+  { code: '110020', name: '易方达沪深300ETF联接', sector: '沪深300', desc: '沪深300增强' },
+  // 创业板
+  { code: '110026', name: '易方达创业板ETF联接A', sector: '沪深300', desc: '创业板指数' },
+  // 科创50
+  { code: '011612', name: '华夏科创50ETF联接A', sector: '芯片半导体', desc: '科创50指数' },
+];
+
+// ===================================================================
+//  JSONP HELPER — 跨域请求
+// ===================================================================
+function jsonpRequest(url, timeout = 6000) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'jpcb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    window[cbName] = function(data) {
+      delete window[cbName];
+      const s = document.getElementById('_js_' + cbName);
+      if (s) s.remove();
+      resolve(data);
+    };
+    const script = document.createElement('script');
+    script.id = '_js_' + cbName;
+    const sep = url.includes('?') ? '&' : '?';
+    script.src = url + sep + 'callback=' + cbName;
+    script.onerror = () => {
+      delete window[cbName];
+      const s = document.getElementById('_js_' + cbName);
+      if (s) s.remove();
+      reject(new Error('JSONP load failed'));
+    };
+    setTimeout(() => {
+      if (window[cbName]) {
+        delete window[cbName];
+        const s = document.getElementById('_js_' + cbName);
+        if (s) s.remove();
+        reject(new Error('JSONP timeout'));
+      }
+    }, timeout);
+    document.head.appendChild(script);
+  });
+}
+
+// ===================================================================
+//  FETCH FUND NAV — 实时净值
+// ===================================================================
+async function fetchFundNav(code) {
+  try {
+    const data = await jsonpRequest(`https://fundgz.1234567.com.cn/js/${code}.js`, 6000);
+    return {
+      nav: parseFloat(data.gsz) || 0,
+      navPrev: parseFloat(data.dwjz) || 0,
+      change: parseFloat(data.gszzl) || 0,
+      navDate: data.jzrq || '',
+      name: data.name || code,
+    };
+  } catch(e) {
+    try {
+      const data = await jsonpRequest(
+        `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${code}&pageIndex=1&pageSize=5`, 5000
+      );
+      if (data.Data && data.Data.LSJZList && data.Data.LSJZList.length > 0) {
+        const list = data.Data.LSJZList;
+        const latest = list[0];
+        const prev = list[1] || list[0];
+        return {
+          nav: parseFloat(latest.NAV) || 0,
+          navPrev: parseFloat(prev.NAV) || 0,
+          change: prev ? ((parseFloat(latest.NAV) - parseFloat(prev.NAV)) / parseFloat(prev.NAV) * 100) : 0,
+          navDate: latest.FSRQ || '',
+          name: code,
+        };
+      }
+    } catch(e2) {}
+    return null;
+  }
+}
+
+// ===================================================================
+//  FETCH MARKET INDICES — 大盘指数
+// ===================================================================
+async function fetchIndices() {
+  const secids = [
+    '1.000001',   // 上证指数
+    '0.399001',   // 深证成指
+    '0.399006',   // 创业板指
+    '1.000688',   // 科创50
+    '1.000300',   // 沪深300
+    '1.000016',   // 上证50
+    '0.399933',    // 中证1000
+  ];
+  const indexNames = {
+    '1.000001': '上证指数', '0.399001': '深证成指', '0.399006': '创业板指',
+    '1.000688': '科创50', '1.000300': '沪深300', '1.000016': '上证50',
+    '0.399933': '中证1000',
+  };
+  try {
+    const url = `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&fields=f2,f3,f4,f12,f14&secids=${secids.join(',')}`;
+    const data = await jsonpRequest(url, 8000);
+    if (data.data && data.data.diff) {
+      return data.data.diff.map(item => ({
+        code: item.f12,
+        name: indexNames[item.f12] || item.f14 || item.f12,
+        price: item.f2,
+        changePct: item.f3,
+        changeAmt: item.f4,
+      }));
+    }
+    return null;
+  } catch(e) {
+    return null;
+  }
+}
+
+// ===================================================================
+//  FETCH HOT SECTORS — 热门板块
+// ===================================================================
+async function fetchHotSectors() {
+  try {
+    const url = 'https://push2.eastmoney.com/api/qt/clist/get?cb=&pn=1&pz=10&po=1&np=1&fields=f12,f14,f2,f3,f4,f62,f184,f66&fid=f3&fs=m:90+t:3';
+    const data = await jsonpRequest(url, 8000);
+    if (data.data && data.data.diff) {
+      return data.data.diff.map(item => ({
+        code: item.f12,
+        name: item.f14,
+        price: item.f2,
+        changePct: item.f3,
+        changeAmt: item.f4,
+      })).slice(0, 6);
+    }
+    return null;
+  } catch(e) {
+    return null;
+  }
+}
+
+// ===================================================================
+//  ENTRY SIGNAL — 入场信号计算
+// ===================================================================
+function getEntrySignal(fund) {
+  const chg = parseFloat(fund.change || 0);
+  const pnlRate = fund.pnlRate !== undefined ? fund.pnlRate : 0;
+
+  if (pnlRate < -10 && chg < -1.5) return { icon: '🟢', text: '超跌补仓', tip: '跌幅较大+今日续跌，可考虑分批补仓', level: 'buy' };
+  if (pnlRate < -10) return { icon: '🟢', text: '逢低布局', tip: '累计跌幅>10%，估值偏低可关注', level: 'buy' };
+  if (pnlRate > 15 && chg > 1) return { icon: '🔴', text: '止盈信号', tip: '累计收益>15%+今日大涨，建议分批止盈', level: 'sell' };
+  if (pnlRate > 10) return { icon: '🟡', text: '注意止盈', tip: '收益>10%，考虑部分止盈', level: 'watch' };
+  if (chg < -2) return { icon: '🔵', text: '小幅补仓', tip: '单日跌幅>2%，可小额补仓', level: 'buy' };
+  if (chg < -1.5 && pnlRate < -5) return { icon: '🔵', text: '加仓机会', tip: '今日较大下跌，可加仓摊平成本', level: 'buy' };
+  if (chg > 2) return { icon: '🟠', text: '追高风险', tip: '单日涨幅>2%，追高需谨慎', level: 'caution' };
+  return { icon: '⚪', text: '正常持有', tip: '波动正常，继续持有', level: 'hold' };
+}
+
+// ===================================================================
+//  ADVICE ENGINE
+// ===================================================================
+function getAdvice(fund) {
+  const pnl = fund.pnl || 0;
+  const pnlRate = fund.pnlRate || 0;
+  const change = fund.change || 0;
+
+  if (pnlRate > 15) return { label: '🔔 考虑止盈', type: 'cut', text: '收益超15%，可分批止盈' };
+  if (pnlRate > 8) return { label: '📊 持有观察', type: 'hold', text: '收益不错，继续持有' };
+  if (pnlRate < -15) return { label: '⚠️ 关注补仓', type: 'watch', text: '跌幅较大，可定投摊平' };
+  if (pnlRate < -8) return { label: '👀 逢低关注', type: 'hold', text: '短期回调，逢低可加' };
+  if (change < -2) return { label: '📉 今日大跌', type: 'add', text: '单日大跌，可小额补仓' };
+  return { label: '✅ 持有', type: 'hold', text: '正常持有' };
+}
+
+// ===================================================================
+//  MARKET RADAR
+// ===================================================================
+function getMarketRadar(funds) {
+  const totalPnl = funds.reduce((s, f) => s + (f.pnl || 0), 0);
+  const totalAmt = funds.reduce((s, f) => s + (f.amount || 0), 0);
+  const totalRate = totalAmt ? (totalPnl / totalAmt * 100) : 0;
+  const fundsDown = funds.filter(f => (f.change || 0) < -1).length;
+  const fundsUp = funds.filter(f => (f.change || 0) > 1).length;
+
+  // 行业分散度
+  const sectors = new Set(funds.map(f => f.sector || '其他')).size;
+
+  return [
+    {
+      title: '📊 组合健康度',
+      signal: totalRate > -3 ? '🟢 良好' : totalRate > -8 ? '🟡 关注' : '🔴 需调整',
+      desc: totalRate > -3 ? '整体组合抗风险能力较强' : '组合回撤偏大，建议增加防御配置'
+    },
+    {
+      title: '🔥 板块热度',
+      signal: fundsUp > fundsDown ? '🔥 偏热' : fundsUp === fundsDown ? '➡️ 均衡' : '❄️ 偏冷',
+      desc: fundsUp > fundsDown ? `${fundsUp}只上涨，市场偏强` : `${fundsDown}只下跌，注意风险`
+    },
+    {
+      title: '⚖️ 分散度评估',
+      signal: sectors >= 5 ? '✅ 分散' : sectors >= 3 ? '🟡 一般' : '🔴 集中',
+      desc: `${sectors}个板块${funds.length}只基金，${sectors >= 5 ? '分散风险较好' : '建议增加不同板块'}`
+    },
+  ];
+}
+
+// ===================================================================
+//  STRATEGIES
+// ===================================================================
+function getStrategies(funds) {
+  const totalAmt = funds.reduce((s, f) => s + (f.amount || 0), 0);
+  const totalPnl = funds.reduce((s, f) => s + (f.pnl || 0), 0);
+  const totalRate = totalAmt ? (totalPnl / totalAmt * 100) : 0;
+
+  const sectorWeights = {};
+  funds.forEach(f => {
+    const sec = f.sector || '其他';
+    sectorWeights[sec] = (sectorWeights[sec] || 0) + (f.amount || 0);
+  });
+
+  const topSector = Object.entries(sectorWeights).sort((a,b) => b[1]-a[1])[0];
+  const worstFunds = [...funds].sort((a,b) => (a.pnlRate||0) - (b.pnlRate||0)).slice(0, 2);
+  const bestFunds = [...funds].sort((a,b) => (b.pnlRate||0) - (a.pnlRate||0)).slice(0, 2);
+
+  return [
+    {
+      title: '🎯 调仓建议',
+      content: [
+        `总收益 ${totalRate >= 0 ? '+' : ''}${totalRate.toFixed(1)}%，${totalRate > 0 ? '整体盈利' : '需关注亏损基金'}`,
+        topSector ? `⚡ 最大板块：${topSector[0]} (${(topSector[1]/totalAmt*100).toFixed(0)}%)` : '',
+        '📌 单只基金占比不超过20%，板块不超过30%',
+        `📅 建议${totalRate < -5 ? '定投摊平成本' : '持续投入'}`,
+      ].filter(Boolean),
+    },
+    {
+      title: '⚠️ 风险提醒',
+      content: [
+        worstFunds[0] ? `🔴 亏损最大：${worstFunds[0]?.name} (${worstFunds[0]?.pnlRate?.toFixed(1)}%)` : '',
+        worstFunds[1] ? `🔴 次亏：${worstFunds[1]?.name} (${worstFunds[1]?.pnlRate?.toFixed(1)}%)` : '',
+        bestFunds[0] ? `🟢 盈利最佳：${bestFunds[0]?.name} (+${bestFunds[0]?.pnlRate?.toFixed(1)}%)` : '',
+        totalRate < -5 ? '⚠️ 总亏损超5%，建议评估策略' : '✅ 整体风险可控',
+      ].filter(Boolean),
+    },
+    {
+      title: '💡 定投策略',
+      content: [
+        '📆 周定投适合波动大的行业基金（芯片、港股科技）',
+        '📆 月定投适合宽基指数（沪深300、红利低波）',
+        '💰 建议定投金额为月收入的10-20%',
+        '📉 大跌日可临时加投（单日跌幅>2%时）',
+      ],
+    },
+    {
+      title: '🌍 全球化配置建议',
+      content: [
+        '🇨🇳 A股核心：沪深300、科创50作为底仓',
+        '🇭🇰 港股科技：弹性大，适合波段操作',
+        '🛢️ 资源周期：煤、油、化工注意周期反转风险',
+        '💡 建议增加美股QDII或债券基金做对冲',
+      ],
+    },
+  ];
+}
+
+// ===================================================================
+//  SECTOR ANALYSIS
+// ===================================================================
+function getSectorAnalysis(funds) {
+  const sectorMap = {};
+  funds.forEach(f => {
+    const sec = f.sector || '其他';
+    if (!sectorMap[sec]) sectorMap[sec] = { funds: [], total: 0, pnl: 0 };
+    sectorMap[sec].funds.push(f);
+    sectorMap[sec].total += f.amount || 0;
+    sectorMap[sec].pnl += f.pnl || 0;
+  });
+
+  return Object.entries(sectorMap).map(([name, data]) => {
+    const pnlRate = data.total ? (data.pnl / data.total * 100) : 0;
+    return {
+      name, total: data.total, pnl: data.pnl, pnlRate, funds: data.funds,
+      advice: pnlRate > 3 ? '📈 表现较好，可继续持有' :
+              pnlRate < -5 ? '📉 板块回调，关注是否加仓' : '➡️ 震荡格局，观望为主',
+    };
+  });
+}
+
+// ===================================================================
+//  DAILY STRATEGY — 基于市场数据的当日策略
+// ===================================================================
+function generateDailyStrategy(funds, indices, hotSectors) {
+  const totalPnl = funds.reduce((s, f) => s + (f.pnl || 0), 0);
+  const totalAmt = funds.reduce((s, f) => s + (f.amount || 0), 0);
+  const totalRate = totalAmt ? (totalPnl / totalAmt * 100) : 0;
+
+  // 判断市场情绪
+  let sentiment = '中性';
+  let sentimentEmoji = '➖';
+  if (indices && indices.length > 0) {
+    const avgChg = indices.reduce((s, idx) => s + (idx.changePct || 0), 0) / indices.length;
+    if (avgChg > 0.5) { sentiment = '乐观'; sentimentEmoji = '🟢'; }
+    else if (avgChg > 0.15) { sentiment = '偏暖'; sentimentEmoji = '🟡'; }
+    else if (avgChg < -0.5) { sentiment = '谨慎'; sentimentEmoji = '🔴'; }
+    else if (avgChg < -0.15) { sentiment = '偏冷'; sentimentEmoji = '🟠'; }
+    else { sentiment = '中性'; sentimentEmoji = '⚪'; }
+  }
+
+  // 整体建议
+  let suggestion = '持有观望';
+  let suggestionEmoji = '⏸️';
+  if (totalRate < -5 && sentiment === '谨慎') {
+    suggestion = '减仓防御';
+    suggestionEmoji = '📉';
+  } else if (totalRate < -3 && sentiment !== '乐观') {
+    suggestion = '逢低加仓';
+    suggestionEmoji = '📈';
+  } else if (sentiment === '乐观' && totalRate > -3) {
+    suggestion = '积极持有';
+    suggestionEmoji = '🚀';
+  } else if (sentiment === '中性') {
+    suggestion = '持有观望';
+    suggestionEmoji = '⏸️';
+  }
+
+  // 重点操作基金
+  const ops = [];
+  funds.forEach(f => {
+    const chg = parseFloat(f.change || 0);
+    const pnlRate = f.pnlRate || 0;
+    if (chg < -2.5) ops.push({ name: f.name, action: '📉 今日大跌可补', code: f.code });
+    else if (pnlRate > 10 && chg > 1) ops.push({ name: f.name, action: '📈 考虑止盈', code: f.code });
+  });
+  if (ops.length === 0) ops.push({ name: '—', action: '暂无特殊操作', code: '' });
+
+  return { sentiment, sentimentEmoji, suggestion: suggestionEmoji + ' ' + suggestion, ops };
+}
+
+// ===================================================================
+//  FORMAT HELPERS
+// ===================================================================
+function formatMoney(n) {
+  if (n === null || n === undefined || isNaN(n)) return '--';
+  return '¥' + Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function getBadgeClass(type) {
+  const map = { hold: 'badge-hold', add: 'badge-add', cut: 'badge-cut', watch: 'badge-watch' };
+  return map[type] || 'badge-hold';
+}
+
+// ===================================================================
+//  RENDER FUNCTIONS
+// ===================================================================
+
+// --- Stats ---
+function renderStats(funds) {
+  const totalAmt = funds.reduce((s, f) => s + (f.amount || 0), 0);
+  const totalPnl = funds.reduce((s, f) => s + (f.pnl || 0), 0);
+  const totalRate = totalAmt ? (totalPnl / totalAmt * 100) : 0;
+  let dailyPnl = 0;
+  funds.forEach(f => { dailyPnl += (f.amount || 0) * (parseFloat(f.change || 0)) / 100; });
+  const sectors = new Set(funds.map(f => f.sector || '其他')).size;
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+
+  document.getElementById('totalAmount').textContent = formatMoney(totalAmt);
+  document.getElementById('totalPnl').textContent = (totalPnl >= 0 ? '+' : '') + formatMoney(Math.abs(totalPnl));
+  document.getElementById('totalPnl').style.color = totalPnl >= 0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('totalPnlRate').textContent = `(${totalRate >= 0 ? '+' : ''}${totalRate.toFixed(2)}%)`;
+  document.getElementById('totalPnlRate').style.color = totalRate >= 0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('dailyPnl').textContent = (dailyPnl >= 0 ? '+' : '') + formatMoney(Math.round(Math.abs(dailyPnl)));
+  document.getElementById('dailyPnl').style.color = dailyPnl >= 0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('dailyDate').textContent = dateStr;
+  document.getElementById('marketDate').textContent = '📅 ' + dateStr;
+  document.getElementById('fundCount').textContent = funds.length;
+  document.getElementById('sectorCount').textContent = `${sectors} 个行业板块`;
+}
+
+// --- Sector Tags ---
+function renderSectorTags(funds) {
+  const sectors = [...new Set(funds.map(f => f.sector || '其他').filter(Boolean))];
+  document.getElementById('sectorTags').innerHTML =
+    '<span class="sector-tag active" onclick="filterSector(\'all\',this)">📊 全部 (' + funds.length + ')</span>' +
+    sectors.map(s => {
+      const cnt = funds.filter(f => (f.sector || '其他') === s).length;
+      return '<span class="sector-tag" onclick="filterSector(\'' + s + '\',this)">' + s + ' (' + cnt + ')</span>';
+    }).join('');
+}
+
+// --- Fund Rows ---
+function renderFundRows(funds, totalAmt) {
+  const listEl = document.getElementById('fundList');
+  funds.sort((a, b) => (a.pnl || 0) - (b.pnl || 0));
+
+  listEl.innerHTML = funds.map((f, i) => {
+    const chg = parseFloat(f.change || 0);
+    const pnl = f.pnl || 0;
+    const pnlRate = f.pnlRate !== undefined ? f.pnlRate : (f.amount ? (pnl / f.amount * 100) : 0);
+    const weight = totalAmt ? ((f.amount || 0) / totalAmt * 100) : 0;
+    const advice = getAdvice(f);
+    const signal = getEntrySignal(f);
+
+    return '<div class="fund-row" onclick="showFundDetail(\'' + f.code + '\')">' +
+      '<div class="idx">' + (i + 1) + '</div>' +
+      '<div class="name">' +
+        (f.name || f.NAME || f.code) +
+        '<span class="code">' + f.code + '</span>' +
+        (f.sector ? '<span class="sector-t">' + f.sector + '</span>' : '') +
+      '</div>' +
+      '<div class="amt">' + formatMoney(f.amount || 0) + '</div>' +
+      '<div class="nav">' + (f.nav ? f.nav.toFixed(4) : (f.navPrev || '--')) + '</div>' +
+      '<div class="chg ' + (chg >= 0 ? 'up' : 'down') + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%</div>' +
+      '<div class="pct hide-mobile ' + (pnlRate >= 0 ? 'up' : 'down') + '">' + (pnlRate >= 0 ? '+' : '') + pnlRate.toFixed(1) + '%</div>' +
+      '<div class="pnl hide-mobile">' +
+        '<div class="amt ' + (pnl >= 0 ? 'up' : 'down') + '">' + (pnl >= 0 ? '+' : '') + formatMoney(pnl) + '</div>' +
+        '<div class="pct">' + (pnlRate >= 0 ? '+' : '') + pnlRate.toFixed(1) + '%</div>' +
+      '</div>' +
+      '<div class="weight hide-mobile">' +
+        weight.toFixed(1) + '%' +
+        '<div class="progress-bar"><div class="fill" style="width:' + weight + '%;background:' + (weight > 20 ? 'var(--red)' : 'var(--blue)') + '"></div></div>' +
+      '</div>' +
+      '<div class="signal signal-tip" data-tip="' + signal.tip + '">' + signal.icon + '</div>' +
+      '<div class="action"><span class="badge ' + getBadgeClass(advice.type) + '">' + advice.label + '</span></div>' +
+    '</div>';
+  }).join('');
+}
+
+// --- Indices ---
+function renderIndices(indices) {
+  const el = document.getElementById('indexGrid');
+  if (!indices || indices.length === 0) {
+    el.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-dim);font-size:13px;background:var(--bg);border-radius:8px">' +
+      '📡 指数数据暂不可用<br><span style="font-size:11px">在家或手机热点网络下自动获取</span></div>';
+    return;
+  }
+  el.innerHTML = indices.map(idx => {
+    const pct = idx.changePct;
+    const amt = idx.changeAmt;
+    const price = idx.price;
+    return '<div class="index-item">' +
+      '<div class="idx-name">' + idx.name + '</div>' +
+      '<div class="idx-price">' + (price != null ? price.toFixed(2) : '--') + '</div>' +
+      '<div class="idx-change ' + (pct >= 0 ? 'up' : 'down') + '">' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%</div>' +
+      '<div class="idx-chgval">' + (amt != null ? (amt >= 0 ? '+' : '') + amt.toFixed(2) : '') + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// --- Radar ---
+function renderRadar(funds) {
+  const radar = getMarketRadar(funds);
+  document.getElementById('radarGrid').innerHTML = radar.map(r =>
+    '<div class="radar-item">' +
+      '<div class="title">' + r.title + '</div>' +
+      '<div class="signal">' + r.signal + '</div>' +
+      '<div class="desc">' + r.desc + '</div>' +
+    '</div>'
+  ).join('');
+}
+
+// --- Strategies ---
+function renderStrategies(funds) {
+  const strategies = getStrategies(funds);
+  document.getElementById('strategyGrid').innerHTML = strategies.map(s =>
+    '<div class="strategy-card">' +
+      '<h3>' + s.title + '</h3>' +
+      '<ul>' + s.content.map(c => '<li>' + c + '</li>').join('') + '</ul>' +
+    '</div>'
+  ).join('');
+}
+
+// --- Sectors ---
+function renderSectors(funds) {
+  const sectors = getSectorAnalysis(funds);
+  const totalAmt = funds.reduce((s, f) => s + (f.amount || 0), 0);
+  document.getElementById('sectorGrid').innerHTML = sectors.map(s =>
+    '<div class="sector-card">' +
+      '<div class="sector-name">' + s.name + '</div>' +
+      '<div class="sector-stats">' + s.funds.length + '只基金 | 仓位 ' + (s.total / totalAmt * 100).toFixed(0) + '% | 收益 ' + (s.pnl >= 0 ? '+' : '') + s.pnlRate.toFixed(1) + '%</div>' +
+      '<div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">' + s.advice + '</div>' +
+      s.funds.map(f =>
+        '<div class="sector-view">' +
+          '<span>' + f.name + '</span>' +
+          '<span class="' + ((f.pnl||0) >= 0 ? 'up' : 'down') + '">' + ((f.pnl||0) >= 0 ? '+' : '') + formatMoney(f.pnl || 0) + '</span>' +
+        '</div>'
+      ).join('') +
+    '</div>'
+  ).join('');
+}
+
+// --- Opportunity ---
+function renderOpportunity(hotSectors, funds) {
+  const el = document.getElementById('opportunityContent');
+  if (!hotSectors || hotSectors.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-dim);font-size:12px">🔄 板块数据加载中...<br><span style="font-size:11px">切换至家庭网络自动获取</span></div>';
+    return;
+  }
+
+  // 热门板块标签
+  const hotHtml = '<div class="hot-sector-list">' +
+    hotSectors.map(s =>
+      '<div class="hot-sector-item">' +
+        '<span class="hs-name">' + s.name + '</span>' +
+        '<span class="hs-change ' + (s.changePct >= 0 ? 'up' : 'down') + '">' + (s.changePct >= 0 ? '+' : '') + s.changePct.toFixed(2) + '%</span>' +
+      '</div>'
+    ).join('') +
+  '</div>';
+
+  // 根据热门板块推荐基金
+  const sectorKeywords = {
+    '半导体': '芯片半导体', '芯片': '芯片半导体', '科创': '芯片半导体',
+    '新能源': '新能源', '新能车': '新能源', '光伏': '新能源',
+    '消费': '消费', '食品': '消费', '白酒': '消费',
+    '医药': '医药', '医疗': '医药', '生物': '医药',
+    '科技': 'AI科技', '信息': 'AI科技', 'AI': 'AI科技', '人工智能': 'AI科技',
+    '军工': '军工', '国防': '军工',
+    '黄金': '黄金', '有色': '黄金',
+    '沪深300': '沪深300', '中证': '沪深300',
+    '红利': '红利低波',
+    '港股': '港股科技', '恒生': '港股科技',
+    '化工': '化工', '材料': '化工',
+    '煤炭': '煤炭', '能源': '石油天然气', '石油': '石油天然气',
+  };
+
+  // 找与热门板块匹配的推荐基金
+  const matchedFunds = [];
+  const matchedCodes = new Set();
+  hotSectors.forEach(s => {
+    const sname = s.name;
+    let targetSector = null;
+    for (const [kw, sec] of Object.entries(sectorKeywords)) {
+      if (sname.includes(kw)) { targetSector = sec; break; }
+    }
+    if (targetSector) {
+      const matches = RECOMMENDED_POOL.filter(r => r.sector === targetSector && !matchedCodes.has(r.code));
+      matches.forEach(m => { matchedCodes.add(m.code); matchedFunds.push({ ...m, hotSector: sname, hotChg: s.changePct }); });
+    }
+  });
+
+  // 如果匹配不够，补充一些
+  if (matchedFunds.length < 3) {
+    const topSectors = hotSectors.slice(0, 3);
+    topSectors.forEach(s => {
+      const fallbacks = RECOMMENDED_POOL.filter(r => !matchedCodes.has(r.code));
+      fallbacks.forEach(f => {
+        if (matchedFunds.length < 5) {
+          matchedCodes.add(f.code);
+          matchedFunds.push({ ...f, hotSector: s.name, hotChg: s.changePct });
+        }
+      });
+    });
+  }
+
+  const oppFundsHtml = matchedFunds.length > 0
+    ? '<div class="opp-section-label">💡 推荐关注</div>' +
+      matchedFunds.slice(0, 5).map(f =>
+        '<div class="opp-fund-item">' +
+          '<div class="opp-name">' +
+            '<span>' + f.name + '</span>' +
+            '<span class="opp-code">' + f.code + ' · ' + f.sector + '</span>' +
+          '</div>' +
+          '<div class="opp-advice" style="color:var(--yellow)">关注</div>' +
+        '</div>'
+      ).join('')
+    : '';
+
+  el.innerHTML = hotHtml + oppFundsHtml;
+}
+
+// --- Daily Strategy ---
+function renderDailyStrategy(funds, indices, hotSectors) {
+  const strategy = generateDailyStrategy(funds, indices, hotSectors);
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+  const el = document.getElementById('dailyStrategyContent');
+  el.innerHTML =
+    '<div class="ds-sentiment">市场情绪：' + strategy.sentimentEmoji + ' ' + strategy.sentiment + '</div>' +
+    '<div class="ds-suggestion">' + strategy.suggestion + '</div>' +
+    '<ul class="ds-detail">' +
+      strategy.ops.map(o => '<li>' + o.action + (o.name !== '—' ? ' · ' + o.name : '') + '</li>').join('') +
+    '</ul>' +
+    '<div class="ds-time-label">⏰ 策略更新于 ' + timeStr + ' · 仅供参考</div>';
+}
+
+// --- Pool ---
+function renderPool() {
+  // 已关注的基金代码
+  const followed = new Set(FUNDS.map(f => f.code));
+
+  document.getElementById('poolGrid').innerHTML = RECOMMENDED_POOL.map(f => {
+    const isFollowed = followed.has(f.code);
+    return '<div class="pool-card">' +
+      '<div class="pool-name">' + f.name + '</div>' +
+      '<div class="pool-code">' + f.code + '</div>' +
+      '<div class="pool-sector">' + f.sector + '</div>' +
+      '<div class="pool-footer">' +
+        '<span class="pool-desc">' + f.desc + '</span>' +
+        '<button class="pool-follow-btn ' + (isFollowed ? 'followed' : '') + '" onclick="followPoolFund(\'' + f.code + '\',\'' + f.name + '\',\'' + f.sector + '\',this)">' +
+          (isFollowed ? '✔ 已关注' : '+ 关注') +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ===================================================================
+//  FOLLOW POOL FUND — 一键关注加入持仓
+// ===================================================================
+window.followPoolFund = function(code, name, sector, btn) {
+  if (FUNDS.some(f => f.code === code)) {
+    btn.textContent = '✔ 已关注';
+    btn.classList.add('followed');
+    return;
+  }
+  FUNDS.push({ code, name, amount: 1000, sector, pnl: 0, pnlRate: 0 });
+  saveFunds();
+  btn.textContent = '✔ 已关注';
+  btn.classList.add('followed');
+  loadData();
+};
+
+// ===================================================================
+//  FILTER
+// ===================================================================
+window.filterSector = function(sector, el) {
+  document.querySelectorAll('.sector-tag').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const rows = document.querySelectorAll('.fund-row');
+  rows.forEach((row, i) => {
+    const name = FUNDS[i]?.sector || '';
+    row.style.display = sector === 'all' || name === sector ? '' : 'none';
+  });
+};
+
+// ===================================================================
+//  MODAL
+// ===================================================================
+window.showAddModal = function() {
+  document.getElementById('addModal').classList.add('show');
+};
+window.hideAddModal = function() {
+  document.getElementById('addModal').classList.remove('show');
+};
+window.addFund = async function() {
+  const code = document.getElementById('fundCodeInput').value.trim();
+  const amount = parseFloat(document.getElementById('fundAmountInput').value) || 0;
+  const sector = document.getElementById('fundSectorInput').value;
+
+  if (!code || code.length !== 6) { alert('请输入6位基金代码'); return; }
+
+  const info = await fetchFundNav(code);
+  if (!info) {
+    FUNDS.push({ code, amount, sector: sector || undefined, name: code });
+  } else {
+    FUNDS.push({ code, amount, sector: sector || undefined, name: info.name || code, pnl: 0, pnlRate: 0 });
+  }
+  hideAddModal();
+  document.getElementById('fundCodeInput').value = '';
+  document.getElementById('fundAmountInput').value = '';
+  saveFunds();
+  loadData();
+};
+
+// ===================================================================
+//  PERSISTENCE
+// ===================================================================
+function saveFunds() {
+  const data = FUNDS.map(f => ({
+    code: f.code, name: f.name, amount: f.amount,
+    sector: f.sector, pnl: f.pnl, pnlRate: f.pnlRate,
+  }));
+  localStorage.setItem('hermes_fund_tracker', JSON.stringify(data));
+}
+
+function loadFunds() {
+  const saved = localStorage.getItem('hermes_fund_tracker');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (data.length > 0) {
+        FUNDS.length = 0;
+        data.forEach(d => FUNDS.push({ ...d }));
+        return true;
+      }
+    } catch(e) {}
+  }
+  return false;
+}
+
+// ===================================================================
+//  REFRESH DAILY STRATEGY
+// ===================================================================
+window.refreshDailyStrategy = function() {
+  // 用当前已有数据重新生成策略
+  const funds = FUNDS.filter(f => f.nav != null);
+  // 尝试重新获取指数
+  fetchIndices().then(indices => {
+    renderDailyStrategy(funds.length > 0 ? funds : FUNDS, indices, null);
+    // 保存到 localStorage
+    const strategy = generateDailyStrategy(funds.length > 0 ? funds : FUNDS, indices, null);
+    localStorage.setItem('hermes_daily_advice', JSON.stringify({
+      time: new Date().toISOString(),
+      strategy: strategy,
+    }));
+  }).catch(() => {
+    // 只用本地数据生成
+    const strategy = generateDailyStrategy(funds.length > 0 ? funds : FUNDS, null, null);
+    renderDailyStrategy(funds.length > 0 ? funds : FUNDS, null, null);
+    localStorage.setItem('hermes_daily_advice', JSON.stringify({
+      time: new Date().toISOString(),
+      strategy: strategy,
+    }));
+  });
+};
+
+// ===================================================================
+//  FUND DETAIL
+// ===================================================================
+window.showFundDetail = function(code) {
+  window.open('https://fund.eastmoney.com/' + code + '.html', '_blank');
+};
+
+// ===================================================================
+//  NETWORK BANNER
+// ===================================================================
+function updateNetworkBanner(funds, navLoaded) {
+  const el = document.getElementById('networkBanner');
+  if (navLoaded === 0 && funds.length > 0) {
+    el.style.display = 'block';
+    el.className = 'network-banner fail';
+    el.innerHTML = '⚠️ 当前网络无法访问天天基金网。在家或手机热点网络下会自动获取实时数据。数据来自本地缓存。';
+  } else if (navLoaded < funds.length) {
+    el.style.display = 'block';
+    el.className = 'network-banner warn';
+    el.innerHTML = '⚠️ 部分基金净值获取失败(' + (funds.length - navLoaded) + '/' + funds.length + ')，请检查网络连接。';
+  } else if (funds.length > 0) {
+    el.style.display = 'block';
+    el.className = 'network-banner ok';
+    el.innerHTML = '✅ 所有数据已更新 · 每5分钟自动刷新 · ' + new Date().toLocaleTimeString('zh-CN');
+  }
+}
+
+// ===================================================================
+//  MAIN LOAD
+// ===================================================================
+async function loadData() {
+  const listEl = document.getElementById('fundList');
+  const updateTimeEl = document.getElementById('updateTime');
+  const now = new Date();
+
+  // 并发获取净值
+  const results = await Promise.allSettled(FUNDS.map(f => fetchFundNav(f.code).then(r => ({ ...f, ...r }))));
+
+  const updatedFunds = [];
+  results.forEach(r => {
+    if (r.status === 'fulfilled' && r.value) updatedFunds.push(r.value);
+  });
+
+  if (updatedFunds.length === 0) {
+    listEl.innerHTML = '<div class="loading" style="padding:30px">' +
+      '<div style="font-size:40px;margin-bottom:12px">📡</div>' +
+      '<div style="font-weight:500;margin-bottom:8px">暂无实时数据</div>' +
+      '<div style="font-size:13px;color:var(--text-dim);line-height:1.8">当前网络可能无法访问天天基金网 😅<br>' +
+      '持仓数据来自本地缓存，实时净值将在可访问的网络下自动加载</div></div>';
+    updateNetworkBanner(FUNDS, 0);
+
+    // 即使无网络也要渲染页面其他部分
+    renderStats([]);
+    renderSectorTags([]);
+    renderFundRows([], 0);
+    renderRadar([]);
+    renderStrategies([]);
+    renderSectors([]);
+    renderIndices(null);
+    renderOpportunity(null);
+    renderPool();
+    updateTimeEl.textContent = '🕐 ' + now.toLocaleTimeString('zh-CN') + ' (缓存模式)';
+    return;
+  }
+
+  const navLoaded = updatedFunds.filter(f => f.nav != null).length;
+  updateNetworkBanner(updatedFunds, navLoaded);
+
+  // 统计
+  const totalAmt = updatedFunds.reduce((s, f) => s + (f.amount || 0), 0);
+
+  // 渲染各模块
+  renderStats(updatedFunds);
+  renderSectorTags(updatedFunds);
+  renderFundRows(updatedFunds, totalAmt);
+  renderRadar(updatedFunds);
+  renderStrategies(updatedFunds);
+  renderSectors(updatedFunds);
+  renderPool();
+
+  // 并发获取指数和板块
+  Promise.all([fetchIndices(), fetchHotSectors()]).then(([indices, hotSectors]) => {
+    renderIndices(indices);
+    renderOpportunity(hotSectors, updatedFunds);
+    renderDailyStrategy(updatedFunds, indices, hotSectors);
+
+    // 尝试恢复或生成每日策略
+    const saved = localStorage.getItem('hermes_daily_advice');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (data.strategy) {
+          // 使用保存的策略，但可能过时了
+          const savedTime = new Date(data.time);
+          const minsAgo = (now - savedTime) / 60000;
+          if (minsAgo < 30) {
+            // 30分钟内有效
+          }
+        }
+      } catch(e) {}
+    }
+    // 总是用最新数据刷新
+    renderDailyStrategy(updatedFunds, indices, hotSectors);
+  }).catch(() => {
+    renderIndices(null);
+    renderOpportunity(null);
+    renderDailyStrategy(updatedFunds, null, null);
+  });
+
+  updateTimeEl.textContent = '🕐 更新于 ' + now.toLocaleTimeString('zh-CN');
+}
+
+// ===================================================================
+//  INIT
+// ===================================================================
+async function init() {
+  loadFunds();
+  renderPool();
+  await loadData();
+
+  // 自动刷新每5分钟
+  setInterval(loadData, 300000);
+}
+
+init();
+</script>
+</body>
+</html>
