@@ -22,12 +22,29 @@ function sparkline(values, w, h, isUp) {
     + '</svg>';
 }
 
+const WORKER_URL = 'https://hermes.1239737251.workers.dev';
+
 async function fetchFundHistory(code) {
   var key = 'navhist_' + code;
   var cached = localStorage.getItem(key);
   if (cached) {
     try { var d = JSON.parse(cached); if (d && d.length >= 5) return d; } catch(_) {}
   }
+  try {
+    var resp = await fetch(WORKER_URL + '/history/' + code);
+    var text = await resp.text();
+    var m = text.match(/jQuery\(([\s\S]+)\)/);
+    if (m) {
+      var data = JSON.parse(m[1]);
+      if (data && data.Data && data.Data.LSJZList && data.Data.LSJZList.length > 5) {
+        var navs = data.Data.LSJZList.map(function(x) { return parseFloat(x.NAV); }).filter(function(x) { return x && !isNaN(x); }).reverse();
+        if (navs.length >= 5) {
+          localStorage.setItem('navhist_' + code, JSON.stringify(navs));
+          return navs;
+        }
+      }
+    }
+  } catch(_) {}
   try {
     var data = await jsonp('https://api.fund.eastmoney.com/f10/lsjz?fundCode=' + code + '&pageIndex=1&pageSize=25', 8000);
     if (data && data.Data && data.Data.LSJZList && data.Data.LSJZList.length > 5) {

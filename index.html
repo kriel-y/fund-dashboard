@@ -402,7 +402,21 @@ function jsonp(url, timeout=6000) {
 // FETCH FUND NAV
 // ================================================================
 async function fetchFundNav(code) {
-  // 1. fundgz live API — try first for real-time data
+  // 1. Cloudflare Worker proxy (bypasses corp firewall)
+  try {
+    const resp = await fetch(WORKER_URL + '/fund/' + code);
+    const text = await resp.text();
+    const m = text.match(/jsonpgz\(([\s\S]+)\)/);
+    if (m) {
+      const data = JSON.parse(m[1]);
+      if (data && data.gsz !== undefined) {
+        navSource = 'live';
+        return {nav:parseFloat(data.gsz)||0, navPrev:parseFloat(data.dwjz)||0, change:parseFloat(data.gszzl)||0, navDate:data.jzrq||''};
+      }
+    }
+  } catch(_) {}
+  
+  // 2. fundgz direct JSONP (fallback)
   try {
     const data = await jsonp(`https://fundgz.1234567.com.cn/js/${code}.js`, 5000);
     if (data && data.gsz !== undefined) {
@@ -439,6 +453,7 @@ async function fetchFundNav(code) {
   return null;
 }
 var navSource = 'cache';
+var WORKER_URL = 'https://hermes.1239737251.workers.dev';
 
 // ================================================================
 // FETCH INDICES — multi-fallback: precomputed JSON → Sina → eastmoney
@@ -463,7 +478,28 @@ async function fetchIndices() {
     }
   } catch(_) {}
 
-  // 2. Sina API via script tag
+  // 2. Cloudflare Worker proxy
+  try {
+    const resp = await fetch(WORKER_URL + '/index');
+    const text = await resp.text();
+    const lines = text.split('\n');
+    const nameMap = {'hq_str_s_sh000001':'\u4e0a\u8bc1\u6307\u6570','hq_str_s_sz399001':'\u6df1\u8bc1\u6210\u6307','hq_str_s_sz399006':'\u521b\u4e1a\u677f\u6307','hq_str_s_sh000688':'\u79d1\u521b50','hq_str_s_sh000300':'\u6caa\u6df1300','hq_str_s_sh000016':'\u4e0a\u8bc150','hq_str_s_sz399852':'\u4e2d\u8bc11000'};
+    const indices = [];
+    lines.forEach(function(line) {
+      line = line.trim();
+      if (!line || !line.includes('=')) return;
+      const parts = line.split('=');
+      const varName = parts[0].replace('var ','').trim();
+      const val = parts[1].trim().replace(/"/g,'');
+      const vals = val.split(',');
+      const name = nameMap[varName];
+      if (name) {
+        indices.push({name: name, price: parseFloat(vals[1])||0, changeAmt: parseFloat(vals[2])||0, changePct: parseFloat(vals[3])||0});
+      }
+    });
+    if (indices.length >= 6) return indices;
+  } catch(_) {}
+  // 3. Sina API via script tag
   try {
     const result = await new Promise((resolve) => {
       const script = document.createElement('script');
